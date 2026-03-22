@@ -88,11 +88,11 @@ export async function getTopMemberByTotalVotesForGuild(
     SELECT
       m.discord_user_id,
       m.display_name,
-      m.total_vote_count
+      m.planned_vote_count AS total_vote_count
     FROM members m
     JOIN servers s ON m.server_id = s.id
     WHERE s.discord_guild_id = $1
-    ORDER BY m.total_vote_count DESC
+    ORDER BY m.planned_vote_count DESC
     LIMIT 1
   `;
 
@@ -127,6 +127,59 @@ export async function getTopGameThisMonthForGuild(
   const res = await pgPool.query<{ game_name: string; votes: string }>(sql, [
     discordGuildId,
   ]);
+
+  if (res.rows.length === 0) return null;
+
+  const row = res.rows[0];
+  return {
+    game_name: row.game_name,
+    votes: Number(row.votes),
+  };
+}
+
+// DB全体で、一番ゲームしている人（members.total_vote_count 最大）
+export async function getTopMemberByTotalVotesGlobal(): Promise<{
+  discord_user_id: string;
+  display_name: string;
+  total_vote_count: number;
+} | null> {
+  const sql = `
+    SELECT
+      m.discord_user_id,
+      m.display_name,
+      m.planned_vote_count AS total_vote_count
+    FROM members m
+    ORDER BY m.planned_vote_count DESC
+    LIMIT 1
+  `;
+
+  const res = await pgPool.query<{
+    discord_user_id: string;
+    display_name: string;
+    total_vote_count: number;
+  }>(sql);
+
+  return res.rows[0] ?? null;
+}
+
+// DB全体で、今月最も投票されているゲーム（game_votes 集計）
+export async function getTopGameThisMonthGlobal(): Promise<{
+  game_name: string;
+  votes: number;
+} | null> {
+  const sql = `
+    SELECT
+      g.name AS game_name,
+      COUNT(*) AS votes
+    FROM game_votes gv
+    JOIN games g ON gv.game_id = g.id
+    WHERE gv.voted_at >= date_trunc('month', CURRENT_DATE)
+    GROUP BY g.name
+    ORDER BY votes DESC
+    LIMIT 1
+  `;
+
+  const res = await pgPool.query<{ game_name: string; votes: string }>(sql);
 
   if (res.rows.length === 0) return null;
 
@@ -276,6 +329,122 @@ export async function recordGameVotesForSchedule(params: {
     }
 
     await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+// 1か月より古い投票データを削除し、その分 games.total_vote_count も減算する
+export async function cleanupOldGameVotesAndAdjustTotalsOlderThanOneMonth(): Promise<{
+  deletedVotes: number;
+  affectedGames: number;
+}> {
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // 1. 1か月より古い投票をゲームごとに集計
+    const aggRes = await client.query<{ game_id: number; cnt: string }>(
+      `
+        SELECT game_id, COUNT(*) AS cnt
+        FROM game_votes
+        WHERE voted_at < now() - INTERVAL '1 month'
+        GROUP BY game_id
+      `
+    );
+
+    const affectedGames = aggRes.rows.length;
+    if (affectedGames === 0) {
+      await client.query("COMMIT");
+      return { deletedVotes: 0, affectedGames: 0 };
+    }
+
+    // 2. 集計結果にもとづいて games.total_vote_count を減算（0未満にはしない）
+    for (const row of aggRes.rows) {
+      const cnt = Number(row.cnt);
+      await client.query(
+        `
+          UPDATE games
+          SET total_vote_count = GREATEST(total_vote_count - $2, 0)
+          WHERE id = $1
+        `,
+        [row.game_id, cnt]
+      );
+    }
+
+    // 3. 古い game_votes を削除
+    const delRes = await client.query(
+      `
+        DELETE FROM game_votes
+        WHERE voted_at < now() - INTERVAL '1 month'
+      `
+    );
+
+    await client.query("COMMIT");
+    return { deletedVotes: delRes.rowCount ?? 0, affectedGames };
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+// 1か月より古い schedule_plans を削除し、その分 members.planned_vote_count も減算する
+export async function cleanupOldSchedulePlansAndAdjustPlannedCountsOlderThanOneMonth(): Promise<{
+  deletedPlans: number;
+  affectedMembers: number;
+}> {
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // 1. 1か月より古い予定をメンバーごとに集計
+    const aggRes = await client.query<{
+      server_id: number;
+      discord_user_id: string;
+      cnt: string;
+    }>(
+      `
+        SELECT server_id, discord_user_id, COUNT(*) AS cnt
+        FROM schedule_plans
+        WHERE planned_at < now() - INTERVAL '1 month'
+        GROUP BY server_id, discord_user_id
+      `
+    );
+
+    const affectedMembers = aggRes.rows.length;
+    if (affectedMembers === 0) {
+      await client.query("COMMIT");
+      return { deletedPlans: 0, affectedMembers: 0 };
+    }
+
+    // 2. 集計結果にもとづいて members.planned_vote_count を減算（0未満にはしない）
+    for (const row of aggRes.rows) {
+      const cnt = Number(row.cnt);
+      await client.query(
+        `
+          UPDATE members
+          SET planned_vote_count = GREATEST(planned_vote_count - $3, 0)
+          WHERE server_id = $1 AND discord_user_id = $2
+        `,
+        [row.server_id, row.discord_user_id, cnt]
+      );
+    }
+
+    // 3. 古い schedule_plans を削除
+    const delRes = await client.query(
+      `
+        DELETE FROM schedule_plans
+        WHERE planned_at < now() - INTERVAL '1 month'
+      `
+    );
+
+    await client.query("COMMIT");
+    return { deletedPlans: delRes.rowCount ?? 0, affectedMembers };
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
     throw e;

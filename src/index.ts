@@ -17,8 +17,12 @@ import {
   deleteGameForGuild,
   getTopMemberByTotalVotesForGuild,
   getTopGameThisMonthForGuild,
+  getTopMemberByTotalVotesGlobal,
+  getTopGameThisMonthGlobal,
   incrementPlannedVoteCountForSchedule,
   recordGameVotesForSchedule,
+  cleanupOldGameVotesAndAdjustTotalsOlderThanOneMonth,
+  cleanupOldSchedulePlansAndAdjustPlannedCountsOlderThanOneMonth,
 } from "./lib/gameRepo";
 import {
   scheduleEmbed,
@@ -49,6 +53,27 @@ function getDisplayName(i: { user: { username: string }; member: unknown | null 
 
 client.once(Events.ClientReady, () => {
   console.log(`Logged in as ${client.user?.tag}`);
+
+  // 1か月より古い投票データを毎日1回クリーンアップする
+  const runCleanup = async () => {
+    try {
+      const { deletedVotes, affectedGames } =
+        await cleanupOldGameVotesAndAdjustTotalsOlderThanOneMonth();
+      const { deletedPlans, affectedMembers } =
+        await cleanupOldSchedulePlansAndAdjustPlannedCountsOlderThanOneMonth();
+      console.log(
+        `[cleanup] old game_votes deleted=${deletedVotes}, adjusted games=${affectedGames}; ` +
+          `old schedule_plans deleted=${deletedPlans}, adjusted members=${affectedMembers}`
+      );
+    } catch (e) {
+      console.error("[cleanup] failed to delete old votes/schedules", e);
+    }
+  };
+
+  // 起動時に1回実行し、その後は24時間ごとに実行
+  void runCleanup();
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  setInterval(runCleanup, oneDayMs);
 });
 
 client.on(Events.InteractionCreate, async (interaction: Interaction) => {
@@ -239,9 +264,10 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
       await i.deferReply({ flags: MessageFlags.Ephemeral });
 
       try {
+        // DB全体から集計
         const [topMember, topGame] = await Promise.all([
-          getTopMemberByTotalVotesForGuild(i.guildId),
-          getTopGameThisMonthForGuild(i.guildId),
+          getTopMemberByTotalVotesGlobal(),
+          getTopGameThisMonthGlobal(),
         ]);
 
         if (!topMember && !topGame) {
