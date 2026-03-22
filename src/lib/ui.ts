@@ -125,7 +125,7 @@ export function scheduleEmbed(s: Schedule) {
     "```",
     timeGraph,
     "```",
-    "**やりたいゲーム投票**",
+    "**やりたいゲーム総選挙**",
     "```",
     gameGraph,
     "```",

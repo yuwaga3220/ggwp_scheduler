@@ -2,7 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 
 export const registerCommand = new SlashCommandBuilder()
   .setName("register")
-  .setDescription("このサーバにゲームを登録します")
+  .setDescription("このサーバにゲームを登録する(英語で入力してね！)")
   .addStringOption((o) =>
     o
       .setName("name")
