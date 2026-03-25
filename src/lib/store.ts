@@ -12,7 +12,7 @@ export const GAME_MASTER: GameMasterItem[] = [
 ];
 
 export type Schedule = {
-  id: string;              // messageId を使う
+  id: string;              // schedule_message_id を使う
   channelId: string;
   ownerId: string;
   ownerName: string;       // 表示用のアカウント名

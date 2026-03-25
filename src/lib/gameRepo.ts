@@ -51,7 +51,7 @@ export async function registerGameForGuild(params: {
     [serverId, gameName]
   );
 
-  return { created: gameRes.rowCount > 0 };
+  return { created: (gameRes.rowCount ?? 0) > 0 };
 }
 
 // /delete から呼び出して、このサーバの登録済みゲームを削除する
@@ -73,7 +73,7 @@ export async function deleteGameForGuild(params: {
     [discordGuildId, gameName]
   );
 
-  return { deleted: result.rowCount > 0 };
+  return { deleted: (result.rowCount ?? 0) > 0 };
 }
 
 // 今月一番ゲームしている人（members.total_vote_count が最大の人）を取得
