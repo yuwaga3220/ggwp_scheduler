@@ -8,8 +8,14 @@ import {
   StringSelectMenuInteraction,
   ButtonInteraction,
   MessageFlags,
+  REST,
+  Routes,
 } from "discord.js";
 import { createSchedule, getSchedule, updateSchedule } from "./lib/store";
+import { scheduleCommand } from "./commands/schedule";
+import { registerCommand } from "./commands/register";
+import { deleteCommand } from "./commands/delete";
+import { rankingCommand } from "./commands/ranking";
 import {
   fetchGameNamesForGuild,
   FALLBACK_GAME_NAMES,
@@ -35,6 +41,15 @@ import {
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
+
+const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN!);
+const clientId = process.env.DISCORD_CLIENT_ID!;
+const slashCommandBody = [
+  scheduleCommand.toJSON(),
+  registerCommand.toJSON(),
+  deleteCommand.toJSON(),
+  rankingCommand.toJSON(),
+];
 
 // ギルド内でのニックネームを優先し、なければユーザ名を返す
 function getDisplayName(i: { user: { username: string }; member: unknown | null }) {
@@ -74,6 +89,18 @@ client.once(Events.ClientReady, () => {
   void runCleanup();
   const oneDayMs = 24 * 60 * 60 * 1000;
   setInterval(runCleanup, oneDayMs);
+});
+
+// 新しいサーバに Bot が追加されたとき、そのサーバへコマンドを自動登録する
+client.on(Events.GuildCreate, async (guild) => {
+  try {
+    await rest.put(Routes.applicationGuildCommands(clientId, guild.id), {
+      body: slashCommandBody,
+    });
+    console.log(`[guildCreate] Slash commands deployed to guild: ${guild.id}`);
+  } catch (e) {
+    console.error(`[guildCreate] Failed to deploy commands for guild: ${guild.id}`, e);
+  }
 });
 
 client.on(Events.InteractionCreate, async (interaction: Interaction) => {
