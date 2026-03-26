@@ -14,11 +14,25 @@ async function main() {
     deleteCommand.toJSON(),
     rankingCommand.toJSON(),
   ];
-  const guildId = process.env.DISCORD_GUILD_ID!;
   const clientId = process.env.DISCORD_CLIENT_ID!;
 
-  await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body });
-  console.log("Slash commands deployed.");
+  // 複数サーバ対応:
+  // DISCORD_GUILD_IDS (カンマ区切り) があればそれを優先し、
+  // なければ従来どおり DISCORD_GUILD_ID を 1件だけ使う。
+  const guildIdsEnv = process.env.DISCORD_GUILD_IDS ?? process.env.DISCORD_GUILD_ID;
+  if (!guildIdsEnv) {
+    throw new Error("DISCORD_GUILD_IDS か DISCORD_GUILD_ID のいずれかを環境変数に設定してください。");
+  }
+
+  const guildIds = guildIdsEnv
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+
+  for (const guildId of guildIds) {
+    await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body });
+    console.log(`Slash commands deployed to guild: ${guildId}`);
+  }
 }
 
 main().catch(console.error);
