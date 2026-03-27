@@ -32,6 +32,7 @@
 ---
 
 ## 3. アーキテクチャ
+[![アーキテクチャ](overview.png)](overview.png)
 - `src/index.ts`  
   Discord イベントハンドリング、コマンド分岐、アプリ全体の制御
 - `src/commands/*`  
