@@ -1,3 +1,6 @@
+/**
+ * データの型定義
+ */
 export type GameMasterItem = {
   id: string;
   name: string;

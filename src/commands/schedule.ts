@@ -1,3 +1,6 @@
+/**
+ * /schedule コマンドの定義
+ */
 import { SlashCommandBuilder } from "discord.js";
 
 export const scheduleCommand = new SlashCommandBuilder()

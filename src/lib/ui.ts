@@ -1,3 +1,6 @@
+/**
+ * UIのビルダー
+ */
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -7,7 +10,7 @@ import {
 } from "discord.js";
 import type { Schedule } from "./store";
 
-/** 各時間帯の参加人数を集計 */
+// 各時間帯の参加人数を集計
 function getSlotCounts(s: Schedule): Map<string, number> {
   const counts = new Map<string, number>();
   for (const slot of s.timeSlots) {
@@ -22,13 +25,13 @@ function getSlotCounts(s: Schedule): Map<string, number> {
   return counts;
 }
 
-/** 参加者名を先頭6文字で切り詰め（超えたら "..." 付き） */
+// 参加者名を先頭6文字で切り詰め（超えたら "..." 付き）
 function truncateName(name: string, maxLen = 6): string {
   if (name.length <= maxLen) return name;
   return name.slice(0, maxLen) + "~";
 }
 
-/** 縦軸=時間、横軸=人数のテキスト棒グラフ（時間帯） */
+// 縦軸=時間、横軸=人数のテキスト棒グラフ（時間帯）
 function buildTimeGraphText(s: Schedule): string {
   const counts = getSlotCounts(s);
   const lines: string[] = [];
@@ -63,7 +66,7 @@ function buildTimeGraphText(s: Schedule): string {
   return lines.join("\n");
 }
 
-/** 縦軸=ゲーム、横軸=人数のテキスト棒グラフ（ゲーム投票） */
+// 縦軸=ゲーム、横軸=人数のテキスト棒グラフ（ゲーム投票）
 function buildGameGraphText(s: Schedule): string {
   if (!s.gameOptions || s.gameOptions.length === 0) {
     return "（ゲーム投票はありません）";
@@ -114,6 +117,7 @@ function buildGameGraphText(s: Schedule): string {
   return lines.join("\n");
 }
 
+// スケジュールの埋め込みを作成
 export function scheduleEmbed(s: Schedule) {
   const timeGraph = buildTimeGraphText(s);
   const gameGraph = buildGameGraphText(s);
@@ -149,7 +153,7 @@ export function scheduleEmbed(s: Schedule) {
     .setFooter({ text: `作成者: ${s.ownerName}` });
 }
 
-/** 時間選択用セレクトメニュー（複数選択可） */
+// 時間選択用セレクトメニュー（複数選択可）
 export function buildScheduleSelectRow(
   messageId: string,
   timeSlots: string[],
@@ -171,7 +175,7 @@ export function buildScheduleSelectRow(
   return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
 }
 
-/** 通知人数（1〜20人）を選ぶセレクトメニュー */
+// 通知人数（1〜20人）を選ぶセレクトメニュー
 export function buildNotifyThresholdRow(
   messageId: string,
   current: number | undefined,
@@ -199,7 +203,7 @@ export function buildNotifyThresholdRow(
   return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
 }
 
-/** やりたいゲームを投票するセレクトメニュー（複数選択可） */
+// やりたいゲームを投票するセレクトメニュー（複数選択可）
 export function buildGameVoteRow(
   messageId: string,
   s: Schedule,
@@ -221,6 +225,7 @@ export function buildGameVoteRow(
   return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
 }
 
+// スケジュールのボタンを作成
 export function scheduleButtons(messageId: string, closed: boolean) {
   const close = new ButtonBuilder()
     .setCustomId(`schedule:close:${messageId}`)

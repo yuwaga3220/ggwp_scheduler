@@ -1,3 +1,6 @@
+/**
+ * /delete コマンドの定義
+ */
 import { SlashCommandBuilder } from "discord.js";
 
 export const deleteCommand = new SlashCommandBuilder()
