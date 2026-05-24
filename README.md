@@ -1,8 +1,14 @@
 # GGWP Scheduler（予定調整チャットボット）
 - Discord 上でゲームの予定調整を行うためのスケジュール管理 Bot です。  
 参加可能時間の可視化、ゲーム投票、ランキング集計、データ永続化までを一貫して実装しました。
-[![アプリ概要](overview.png)](overview.png)
 
+<a href="overview.png">
+  <img src="overview.png" alt="アプリ概要" width="440">
+</a>
+
+<a href="activation.png">
+  <img src="activation.png" alt="Bot起動画面" width="440">
+</a>
 ---
 
 ## 1. 概要
